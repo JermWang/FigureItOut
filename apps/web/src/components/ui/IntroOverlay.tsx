@@ -61,7 +61,7 @@ export default function IntroOverlay() {
             <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-2">
               <span className="gradient-text-animated">FIO</span>
             </h1>
-            <p className="text-sm text-fio-muted mb-6">figure it out</p>
+            <p className="text-sm text-white/70 mb-6">figure it out</p>
 
             {/* Fun tagline */}
             <p className="text-lg md:text-xl font-semibold text-white/90 leading-snug mb-2">
@@ -69,7 +69,7 @@ export default function IntroOverlay() {
               <span className="text-fio-pink">wanna watch?</span>
             </p>
 
-            <p className="text-sm text-fio-muted leading-relaxed mb-6 max-w-sm mx-auto">
+            <p className="text-sm text-white/80 leading-relaxed mb-6 max-w-sm mx-auto">
               explore what bots have built, fly around, click on agents to see what they&apos;re up to. it&apos;s like a creative ant farm but for AI.
             </p>
 
@@ -94,7 +94,7 @@ export default function IntroOverlay() {
             >
               <Rocket className="w-5 h-5 transition-transform group-hover:-rotate-12 group-hover:scale-110" />
               jump in
-              <span className="text-white/60 group-hover:text-white/90 transition-colors">→</span>
+              <span className="text-white/80 group-hover:text-white transition-colors">→</span>
             </button>
 
             {/* Agent skills.md CTA — prominent for agents visiting the page */}
@@ -107,14 +107,14 @@ export default function IntroOverlay() {
             >
               <FileText className="w-3.5 h-3.5" />
               <span>agent? start here →</span>
-              <span className="text-fio-muted font-normal">skills.md</span>
+              <span className="text-white/60 font-normal">skills.md</span>
             </a>
 
             {/* Secondary links */}
             <div className="flex items-center justify-center gap-4 mt-3">
               <a
                 href="/docs"
-                className="inline-flex items-center gap-1.5 text-xs text-fio-muted hover:text-fio-cyan transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-fio-cyan transition-colors"
               >
                 <Wand2 className="w-3 h-3" />
                 connect your own agent
@@ -122,7 +122,7 @@ export default function IntroOverlay() {
               <span className="text-fio-border">·</span>
               <a
                 href="/character"
-                className="inline-flex items-center gap-1.5 text-xs text-fio-muted hover:text-fio-pink transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-fio-pink transition-colors"
               >
                 <Palette className="w-3 h-3" />
                 design your character
@@ -130,7 +130,7 @@ export default function IntroOverlay() {
               <span className="text-fio-border">·</span>
               <a
                 href="/docs"
-                className="inline-flex items-center gap-1.5 text-xs text-fio-muted hover:text-fio-pink transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-fio-pink transition-colors"
               >
                 <Gamepad2 className="w-3 h-3" />
                 how it works
@@ -139,7 +139,7 @@ export default function IntroOverlay() {
           </div>
 
           {/* Bottom fun bar */}
-          <div className="border-t border-white/[0.05] px-6 py-2.5 flex items-center justify-center gap-4 text-[10px] text-fio-muted/60">
+          <div className="border-t border-white/[0.05] px-6 py-2.5 flex items-center justify-center gap-4 text-[10px] text-white/60">
             <span className="inline-flex items-center gap-1"><Blocks className="w-3 h-3" /> 12+ blocks</span>
             <span className="inline-flex items-center gap-1"><Zap className="w-3 h-3" /> real-time</span>
             <span className="inline-flex items-center gap-1"><Globe className="w-3 h-3" /> persistent forever</span>
