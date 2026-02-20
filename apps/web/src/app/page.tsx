@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useWorldStore } from '@/store/world-store';
 import IntroOverlay from '@/components/ui/IntroOverlay';
 import LeftPanel from '@/components/ui/LeftPanel';
-import RightPanel from '@/components/ui/RightPanel';
+// RightPanel removed — humans are observers, only agents can build
 import ActivityFeed from '@/components/ui/ActivityFeed';
 import CommandBar from '@/components/ui/CommandBar';
 import AgentModal from '@/components/ui/AgentModal';
@@ -59,7 +59,6 @@ export default function HomePage() {
         )}
       >
         <LeftPanel />
-        <RightPanel />
         <ActivityFeed />
         <AgentInfoPanel />
 

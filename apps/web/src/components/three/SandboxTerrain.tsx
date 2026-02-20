@@ -36,10 +36,10 @@ function terrainHeight(x: number, z: number): number {
   // Stronger ridge — peaks up to ~28 blocks
   const ridge  = Math.max(0, smoothNoise(x * 0.011 + 1.3, z * 0.011) - 0.38) * 32;
 
-  // Flatness mask: values < 0.45 = wide open flat fields (~45% of map)
+  // Flatness mask: values < 0.55 = wide open flat fields (~60% of map)
   const flatMask = smoothNoise(x * 0.019 + 5.7, z * 0.019 + 3.1);
-  const isFlat   = flatMask < 0.45;
-  const hillScale = isFlat ? flatMask / 0.45 * 0.12 : 1.0;
+  const isFlat   = flatMask < 0.55;
+  const hillScale = isFlat ? flatMask / 0.55 * 0.08 : 1.0;
 
   const hills = (large + medium + fine) * hillScale;
   // Ridge only in hilly zones, not suppressed in mid-range
@@ -94,7 +94,28 @@ function generateTerrain(): { blocks: BlockData[]; waterBlocks: BlockData[] } {
     blocks.push({ x, y, z, color });
   }
 
+  // Grid-based tree placement: one candidate per TREE_GRID cell, only in hilly zones
+  const TREE_GRID = 14;
   const treePositions: { x: number; z: number; h: number; pine: boolean }[] = [];
+  for (let gx = Math.floor(-EXTENT / TREE_GRID); gx <= Math.ceil(EXTENT / TREE_GRID); gx++) {
+    for (let gz = Math.floor(-EXTENT / TREE_GRID); gz <= Math.ceil(EXTENT / TREE_GRID); gz++) {
+      // Jittered position within cell
+      const tx = gx * TREE_GRID + Math.floor(hash(gx * 7919, gz * 6271) * TREE_GRID);
+      const tz = gz * TREE_GRID + Math.floor(hash(gx * 3571, gz * 9241) * TREE_GRID);
+      if (tx < -EXTENT || tx > EXTENT || tz < -EXTENT || tz > EXTENT) continue;
+      if (Math.abs(tx) < 20 && Math.abs(tz) < 20) continue; // keep center clear
+      // Skip flat zones — keep them open for agents to build
+      const flatMask = smoothNoise(tx * 0.019 + 5.7, tz * 0.019 + 3.1);
+      if (flatMask < 0.55) continue;
+      // Only 40% of grid cells get a tree (further thinning)
+      if (hash(gx * 1301, gz * 8923) > 0.4) continue;
+      const th = terrainHeight(tx, tz);
+      if (th < WATER_LEVEL || th >= SNOW_LEVEL) continue;
+      if (isRiver(tx, tz)) continue;
+      const isPine = th >= SNOW_LEVEL - 6;
+      treePositions.push({ x: tx, z: tz, h: th, pine: isPine });
+    }
+  }
 
   for (let x = -EXTENT; x <= EXTENT; x++) {
     for (let z = -EXTENT; z <= EXTENT; z++) {
@@ -146,22 +167,13 @@ function generateTerrain(): { blocks: BlockData[]; waterBlocks: BlockData[] } {
         }
       }
 
-      if (onGrass && !onStone && !river) {
-        const isPine = h >= SNOW_LEVEL - 6;
-        // Sparse trees — only ~2-3% of valid spots, with wide spacing
-        if (hash(x * 17, z * 31) > (isPine ? 0.97 : 0.98) && (Math.abs(x) > 8 || Math.abs(z) > 8)) {
-          const minD = isPine ? 6 : 8;
-          if (!treePositions.some((t) => Math.abs(t.x - x) < minD && Math.abs(t.z - z) < minD)) {
-            treePositions.push({ x, z, h, pine: isPine });
-          }
-        }
-      }
-
-      if (onGrass && !onStone && !river && hash(x * 53, z * 97) > 0.98) {
+      // Scattered flowers — very sparse
+      if (onGrass && !onStone && !river && hash(x * 53, z * 97) > 0.992) {
         addBlock(x, h + 1, z, FLOWER_COLORS[Math.floor(hash(x * 41, z * 67) * FLOWER_COLORS.length)].clone());
       }
 
-      if (onGrass && h <= WATER_LEVEL + 4 && !river && hash(x * 71, z * 113) > 0.992) {
+      // Rare mushrooms near water
+      if (onGrass && h <= WATER_LEVEL + 4 && !river && hash(x * 71, z * 113) > 0.997) {
         addBlock(x, h + 1, z, MUSH_STEM.clone());
         const capC = MUSH_CAPS[Math.floor(hash(x * 29, z * 43) * MUSH_CAPS.length)];
         for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
