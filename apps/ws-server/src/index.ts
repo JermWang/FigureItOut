@@ -290,7 +290,7 @@ function handleMessage(client: Client, raw: string) {
 
 // ─── Apply World Action ───
 function applyAction(world: WorldState, action: WorldAction): boolean {
-  const payload = action.payload as Record<string, unknown>;
+  const payload = (action.payload as unknown) as Record<string, unknown>;
 
   switch (action.type) {
     case 'place_block': {
