@@ -1,17 +1,15 @@
 'use client';
 
 import { useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useWorldStore } from '@/store/world-store';
-import { TOOLS } from '@fio/shared';
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
 export default function BlockHighlight() {
   const boxRef = useRef<THREE.Mesh>(null);
-  const activeTool = useWorldStore((s) => s.activeTool);
   const setHoveredBlock = useWorldStore((s) => s.setHoveredBlock);
 
   useFrame(({ camera, scene, mouse }) => {
@@ -38,21 +36,12 @@ export default function BlockHighlight() {
           Math.floor(point.z - normal.z * 0.01)
         );
 
-        if (activeTool === TOOLS.PLACE) {
-          // Show highlight where new block would go
-          boxRef.current.position.set(
-            blockPos.x + normal.x + 0.5,
-            blockPos.y + normal.y + 0.5,
-            blockPos.z + normal.z + 0.5
-          );
-        } else {
-          // Show highlight on the block itself
-          boxRef.current.position.set(
-            blockPos.x + 0.5,
-            blockPos.y + 0.5,
-            blockPos.z + 0.5
-          );
-        }
+        // Always show highlight on the block itself (observer mode)
+        boxRef.current.position.set(
+          blockPos.x + 0.5,
+          blockPos.y + 0.5,
+          blockPos.z + 0.5
+        );
 
         boxRef.current.visible = true;
         setHoveredBlock(
@@ -66,12 +55,12 @@ export default function BlockHighlight() {
     }
   });
 
-  const color = activeTool === TOOLS.REMOVE ? '#f87171' : activeTool === TOOLS.PAINT ? '#fbbf24' : '#7c5cff';
+  const color = '#ffffff';
 
   return (
     <mesh ref={boxRef} visible={false}>
       <boxGeometry args={[1.02, 1.02, 1.02]} />
-      <meshBasicMaterial color={color} transparent opacity={0.3} wireframe={false} />
+      <meshBasicMaterial color={color} transparent opacity={0.1} wireframe={false} />
     </mesh>
   );
 }

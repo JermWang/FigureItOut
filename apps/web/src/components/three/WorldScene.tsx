@@ -13,9 +13,8 @@ import PlayerController from './PlayerController';
 import HumanAvatar from './avatars/HumanAvatar';
 import AgentAvatar from './avatars/AgentAvatar';
 import PlaneAvatar from './avatars/PlaneAvatar';
-import { BLOCK_MATERIALS, TOOLS } from '@fio/shared';
 
-function SceneContent({ onBlockClick }: { onBlockClick: (wp: any, f: any) => void }) {
+function SceneContent({ onBlockClick }: { onBlockClick: () => void }) {
   const chunks      = useWorldStore((s) => s.chunks);
   const active      = usePlayerStore((s) => s.active);
   const mode        = usePlayerStore((s) => s.mode);
@@ -94,33 +93,15 @@ function SceneContent({ onBlockClick }: { onBlockClick: (wp: any, f: any) => voi
 }
 
 export default function WorldScene() {
-  const activeTool     = useWorldStore((s) => s.activeTool);
-  const activeMaterial = useWorldStore((s) => s.activeMaterial);
-  const placeBlock     = useWorldStore((s) => s.placeBlock);
-  const removeBlock    = useWorldStore((s) => s.removeBlock);
-  const paintBlock     = useWorldStore((s) => s.paintBlock);
   const initializeWorld = useWorldStore((s) => s.initializeWorld);
 
   useEffect(() => {
     initializeWorld();
   }, [initializeWorld]);
 
-  const handleBlockClick = useCallback(
-    (worldPos: { x: number; y: number; z: number }, face: { x: number; y: number; z: number }) => {
-      switch (activeTool) {
-        case TOOLS.PLACE:
-          placeBlock({ x: worldPos.x + face.x, y: worldPos.y + face.y, z: worldPos.z + face.z }, activeMaterial);
-          break;
-        case TOOLS.REMOVE:
-          removeBlock(worldPos);
-          break;
-        case TOOLS.PAINT:
-          paintBlock(worldPos, activeMaterial);
-          break;
-      }
-    },
-    [activeTool, activeMaterial, placeBlock, removeBlock, paintBlock]
-  );
+  const handleBlockClick = useCallback(() => {
+    // Humans are observers only - no building actions allowed
+  }, []);
 
   return (
     <Canvas

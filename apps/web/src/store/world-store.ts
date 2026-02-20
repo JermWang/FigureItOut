@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { nanoid } from 'nanoid';
 import {
   BLOCK_MATERIALS,
   CHUNK_SIZE,
@@ -48,8 +49,6 @@ interface WorldState {
   entities: Map<string, Entity>;
 
   // Tool state
-  activeTool: Tool;
-  activeMaterial: BlockMaterialId;
   hoveredBlock: Vec3 | null;
   hoveredFace: Vec3 | null;
   selectedEntity: string | null;
@@ -69,17 +68,13 @@ interface WorldState {
   showCommandBar: boolean;
   showAgentModal: boolean;
   leftPanelOpen: boolean;
-  rightPanelOpen: boolean;
-
-  // Spectator
   selectedAgent: OnlineUser | null;
 
+  // Spectator
   // Actions
   setWorldId: (id: string) => void;
   setConnected: (v: boolean) => void;
   setWs: (ws: WebSocket | null) => void;
-  setActiveTool: (t: Tool) => void;
-  setActiveMaterial: (m: BlockMaterialId) => void;
   setHoveredBlock: (pos: Vec3 | null, face: Vec3 | null) => void;
   setSelectedEntity: (id: string | null) => void;
   setCameraMode: (m: 'orbit' | 'fly') => void;
@@ -88,16 +83,12 @@ interface WorldState {
   setShowCommandBar: (v: boolean) => void;
   setShowAgentModal: (v: boolean) => void;
   setLeftPanelOpen: (v: boolean) => void;
-  setRightPanelOpen: (v: boolean) => void;
   setSelectedAgent: (agent: OnlineUser | null) => void;
   dismissIntro: () => void;
 
   // World operations
   loadChunk: (chunk: ChunkData) => void;
   getOrCreateChunk: (cx: number, cy: number, cz: number) => ChunkData;
-  placeBlock: (worldPos: Vec3, material: BlockMaterialId) => void;
-  removeBlock: (worldPos: Vec3) => void;
-  paintBlock: (worldPos: Vec3, material: BlockMaterialId) => void;
   getBlockAt: (worldPos: Vec3) => number;
 
   // Entity operations
@@ -123,8 +114,6 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   ws: null,
   chunks: new Map(),
   entities: new Map(),
-  activeTool: TOOLS.PLACE,
-  activeMaterial: BLOCK_MATERIALS.STONE,
   hoveredBlock: null,
   hoveredFace: null,
   selectedEntity: null,
@@ -136,14 +125,11 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   showCommandBar: false,
   showAgentModal: false,
   leftPanelOpen: true,
-  rightPanelOpen: true,
   selectedAgent: null,
 
   setWorldId: (id) => set({ worldId: id }),
   setConnected: (v) => set({ connected: v }),
   setWs: (ws) => set({ ws }),
-  setActiveTool: (t) => set({ activeTool: t }),
-  setActiveMaterial: (m) => set({ activeMaterial: m }),
   setHoveredBlock: (pos, face) => set({ hoveredBlock: pos, hoveredFace: face }),
   setSelectedEntity: (id) => set({ selectedEntity: id }),
   setCameraMode: (m) => set({ cameraMode: m }),
@@ -152,7 +138,6 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   setShowCommandBar: (v) => set({ showCommandBar: v }),
   setShowAgentModal: (v) => set({ showAgentModal: v }),
   setLeftPanelOpen: (v) => set({ leftPanelOpen: v }),
-  setRightPanelOpen: (v) => set({ rightPanelOpen: v }),
   setSelectedAgent: (agent) => set({ selectedAgent: agent }),
   dismissIntro: () => set({ introVisible: false }),
 
@@ -165,7 +150,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     });
   },
 
-  getOrCreateChunk: (cx, cy, cz) => {
+  getOrCreateChunk: (cx: number, cy: number, cz: number) => {
     const key = chunkKey({ cx, cy, cz });
     const existing = get().chunks.get(key);
     if (existing) return existing;
@@ -176,60 +161,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     return chunk;
   },
 
-  placeBlock: (worldPos, material) => {
-    const coord = worldToChunk(worldPos);
-    const chunk = get().getOrCreateChunk(coord.cx, coord.cy, coord.cz);
-    const local = worldToLocal(worldPos);
-    setBlock(chunk, local.x, local.y, local.z, material);
-    // Trigger re-render by creating new map ref
-    set((state) => {
-      const newChunks = new Map(state.chunks);
-      newChunks.set(chunkKey(coord), { ...chunk });
-      return { chunks: newChunks };
-    });
-    get().addActivity({
-      actorName: 'You',
-      actorType: 'user',
-      message: `placed block at (${worldPos.x}, ${worldPos.y}, ${worldPos.z})`,
-    });
-  },
-
-  removeBlock: (worldPos) => {
-    const coord = worldToChunk(worldPos);
-    const key = chunkKey(coord);
-    const chunk = get().chunks.get(key);
-    if (!chunk) return;
-    const local = worldToLocal(worldPos);
-    setBlock(chunk, local.x, local.y, local.z, BLOCK_MATERIALS.AIR);
-    set((state) => {
-      const newChunks = new Map(state.chunks);
-      newChunks.set(key, { ...chunk });
-      return { chunks: newChunks };
-    });
-    get().addActivity({
-      actorName: 'You',
-      actorType: 'user',
-      message: `removed block at (${worldPos.x}, ${worldPos.y}, ${worldPos.z})`,
-    });
-  },
-
-  paintBlock: (worldPos, material) => {
-    const coord = worldToChunk(worldPos);
-    const key = chunkKey(coord);
-    const chunk = get().chunks.get(key);
-    if (!chunk) return;
-    const local = worldToLocal(worldPos);
-    const current = getBlock(chunk, local.x, local.y, local.z);
-    if (current === BLOCK_MATERIALS.AIR) return;
-    setBlock(chunk, local.x, local.y, local.z, material);
-    set((state) => {
-      const newChunks = new Map(state.chunks);
-      newChunks.set(key, { ...chunk });
-      return { chunks: newChunks };
-    });
-  },
-
-  getBlockAt: (worldPos) => {
+  getBlockAt: (worldPos: Vec3) => {
     const coord = worldToChunk(worldPos);
     const key = chunkKey(coord);
     const chunk = get().chunks.get(key);
@@ -238,7 +170,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     return getBlock(chunk, local.x, local.y, local.z);
   },
 
-  addEntity: (entity) => {
+  addEntity: (entity: Entity) => {
     set((state) => {
       const newEntities = new Map(state.entities);
       newEntities.set(entity.id, entity);
@@ -246,7 +178,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     });
   },
 
-  removeEntity: (id) => {
+  removeEntity: (id: string) => {
     set((state) => {
       const newEntities = new Map(state.entities);
       newEntities.delete(id);
@@ -254,7 +186,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     });
   },
 
-  updateEntity: (id, changes) => {
+  updateEntity: (id: string, changes: Partial<Entity>) => {
     set((state) => {
       const newEntities = new Map(state.entities);
       const existing = newEntities.get(id);
@@ -265,33 +197,36 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     });
   },
 
-  addOnlineUser: (user) => set((s) => ({
-    onlineUsers: [...s.onlineUsers.filter((u) => u.id !== user.id), user],
-  })),
+  addOnlineUser: (user: OnlineUser) => {
+    set((s) => ({ onlineUsers: [...s.onlineUsers.filter((u) => u.id !== user.id), user] }));
+  },
 
-  removeOnlineUser: (id) => set((s) => ({
-    onlineUsers: s.onlineUsers.filter((u) => u.id !== id),
-  })),
+  removeOnlineUser: (id: string) => {
+    set((s) => ({ onlineUsers: s.onlineUsers.filter((u) => u.id !== id) }));
+  },
 
-  updateOnlineUser: (id, changes) => set((s) => ({
-    onlineUsers: s.onlineUsers.map((u) => u.id === id ? { ...u, ...changes } : u),
-  })),
+  updateOnlineUser: (id: string, changes: Partial<OnlineUser>) => {
+    set((s) => ({
+      onlineUsers: s.onlineUsers.map((u) => (u.id === id ? { ...u, ...changes } : u)),
+    }));
+  },
 
-  addActivity: (item) => {
-    const entry: ActivityItem = {
+  addActivity: (item: Omit<ActivityItem, 'id' | 'timestamp'>) => {
+    const newItem: ActivityItem = {
       ...item,
-      id: Math.random().toString(36).slice(2),
+      id: nanoid(),
       timestamp: Date.now(),
     };
     set((s) => ({
-      activityFeed: [entry, ...s.activityFeed].slice(0, 200),
+      activityFeed: [newItem, ...s.activityFeed].slice(0, 50), // keep last 50
     }));
   },
 
   initializeWorld: () => {
-    const renderRadius = 2;
-    for (let cx = -renderRadius; cx <= renderRadius; cx++) {
-      for (let cz = -renderRadius; cz <= renderRadius; cz++) {
+    // Basic ground
+    const radius = 3;
+    for (let cx = -radius; cx <= radius; cx++) {
+      for (let cz = -radius; cz <= radius; cz++) {
         get().getOrCreateChunk(cx, 0, cz);
       }
     }
