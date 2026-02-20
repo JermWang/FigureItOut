@@ -7,6 +7,7 @@ import {
   type ChunkData,
   type Vec3,
   type WorldAction,
+  type WorldLabel,
   chunkKey,
   createGroundChunk,
   createEmptyChunk,
@@ -42,7 +43,19 @@ interface WorldState {
   clients: Set<string>;
   auditLog: WorldAction[];
   proposalMode: boolean;
+  labels: Map<string, WorldLabel>;       // labelId → label
+  labelsByPos: Map<string, string>;      // 'x,y,z' → labelId
 }
+
+// Per-agent clipboard: agentId → Map<label, blocks>
+const agentClipboards = new Map<string, Map<string, Array<{ dx: number; dy: number; dz: number; material: number }>>>();
+// Per-agent memos: agentId → Map<key, {value, expiresAt}>
+const agentMemos = new Map<string, Map<string, { value: string; expiresAt: number | null }>>();
+
+const MAX_FILL_VOLUME = 32 * 32 * 32;  // 32768 blocks
+const MAX_BATCH_SIZE  = 2048;
+const MAX_MEMO_LEN    = 4096;
+const MAX_LABEL_LEN   = 120;
 
 // ─── Rate Limiter ───
 class RateLimiter {
@@ -79,6 +92,8 @@ function getOrCreateWorld(worldId: string): WorldState {
       clients: new Set(),
       auditLog: [],
       proposalMode: false,
+      labels: new Map(),
+      labelsByPos: new Map(),
     };
     // Initialize ground chunks
     const radius = 3;
@@ -241,7 +256,7 @@ function handleMessage(client: Client, raw: string) {
       }
 
       // Apply action
-      const applied = applyAction(world, action);
+      const applied = applyAction(world, action, client);
       if (applied) {
         world.auditLog.push(action);
         broadcast(client.worldId, { type: 'action_applied', action });
@@ -294,52 +309,186 @@ function handleMessage(client: Client, raw: string) {
   }
 }
 
+// ─── Block helpers ───
+function placeBlockInWorld(world: WorldState, pos: Vec3, material: number): void {
+  const coord = worldToChunk(pos);
+  const key = chunkKey(coord);
+  let chunk = world.chunks.get(key);
+  if (!chunk) {
+    chunk = createEmptyChunk(coord);
+    world.chunks.set(key, chunk);
+  }
+  const local = worldToLocal(pos);
+  setBlock(chunk, local.x, local.y, local.z, material);
+}
+
+function getBlockInWorld(world: WorldState, pos: Vec3): number {
+  const coord = worldToChunk(pos);
+  const key = chunkKey(coord);
+  const chunk = world.chunks.get(key);
+  if (!chunk) return BLOCK_MATERIALS.AIR;
+  const local = worldToLocal(pos);
+  return getBlock(chunk, local.x, local.y, local.z);
+}
+
 // ─── Apply World Action ───
-function applyAction(world: WorldState, action: WorldAction): boolean {
+function applyAction(world: WorldState, action: WorldAction, client: Client): boolean {
   const payload = (action.payload as unknown) as Record<string, unknown>;
 
   switch (action.type) {
     case 'place_block': {
       const pos = payload.position as Vec3;
       const material = payload.material as number;
-      const coord = worldToChunk(pos);
-      const key = chunkKey(coord);
-      let chunk = world.chunks.get(key);
-      if (!chunk) {
-        chunk = createEmptyChunk(coord);
-        world.chunks.set(key, chunk);
-      }
-      const local = worldToLocal(pos);
-      // Store previous state for rollback
-      action.previousState = { block: getBlock(chunk, local.x, local.y, local.z) };
-      setBlock(chunk, local.x, local.y, local.z, material);
+      action.previousState = { block: getBlockInWorld(world, pos) };
+      placeBlockInWorld(world, pos, material);
       return true;
     }
 
     case 'remove_block': {
       const pos = payload.position as Vec3;
-      const coord = worldToChunk(pos);
-      const key = chunkKey(coord);
-      const chunk = world.chunks.get(key);
-      if (!chunk) return false;
-      const local = worldToLocal(pos);
-      action.previousState = { block: getBlock(chunk, local.x, local.y, local.z) };
-      setBlock(chunk, local.x, local.y, local.z, BLOCK_MATERIALS.AIR);
+      if (getBlockInWorld(world, pos) === BLOCK_MATERIALS.AIR) return false;
+      action.previousState = { block: getBlockInWorld(world, pos) };
+      placeBlockInWorld(world, pos, BLOCK_MATERIALS.AIR);
       return true;
     }
 
     case 'paint_block': {
       const pos = payload.position as Vec3;
       const material = payload.material as number;
-      const coord = worldToChunk(pos);
-      const key = chunkKey(coord);
-      const chunk = world.chunks.get(key);
-      if (!chunk) return false;
-      const local = worldToLocal(pos);
-      const current = getBlock(chunk, local.x, local.y, local.z);
+      const current = getBlockInWorld(world, pos);
       if (current === BLOCK_MATERIALS.AIR) return false;
       action.previousState = { block: current };
-      setBlock(chunk, local.x, local.y, local.z, material);
+      placeBlockInWorld(world, pos, material);
+      return true;
+    }
+
+    case 'fill_region': {
+      const min = payload.min as Vec3;
+      const max = payload.max as Vec3;
+      const material = payload.material as number;
+      const dx = Math.abs(max.x - min.x) + 1;
+      const dy = Math.abs(max.y - min.y) + 1;
+      const dz = Math.abs(max.z - min.z) + 1;
+      if (dx * dy * dz > MAX_FILL_VOLUME) {
+        send(client, { type: 'error', message: `fill_region too large: max ${MAX_FILL_VOLUME} blocks` });
+        return false;
+      }
+      const x0 = Math.min(min.x, max.x), x1 = Math.max(min.x, max.x);
+      const y0 = Math.min(min.y, max.y), y1 = Math.max(min.y, max.y);
+      const z0 = Math.min(min.z, max.z), z1 = Math.max(min.z, max.z);
+      for (let x = x0; x <= x1; x++)
+        for (let y = y0; y <= y1; y++)
+          for (let z = z0; z <= z1; z++)
+            placeBlockInWorld(world, { x, y, z }, material);
+      console.log(`[action] fill_region ${dx}x${dy}x${dz}=${dx*dy*dz} blocks by ${client.name}`);
+      return true;
+    }
+
+    case 'batch_place': {
+      const blocks = payload.blocks as Array<{ position: Vec3; material: number }>;
+      if (!Array.isArray(blocks) || blocks.length > MAX_BATCH_SIZE) {
+        send(client, { type: 'error', message: `batch_place max ${MAX_BATCH_SIZE} blocks` });
+        return false;
+      }
+      for (const b of blocks) placeBlockInWorld(world, b.position, b.material);
+      console.log(`[action] batch_place ${blocks.length} blocks by ${client.name}`);
+      return true;
+    }
+
+    case 'copy_region': {
+      const min = payload.min as Vec3;
+      const max = payload.max as Vec3;
+      const label = (payload.label as string | undefined) ?? 'default';
+      const x0 = Math.min(min.x, max.x), x1 = Math.max(min.x, max.x);
+      const y0 = Math.min(min.y, max.y), y1 = Math.max(min.y, max.y);
+      const z0 = Math.min(min.z, max.z), z1 = Math.max(min.z, max.z);
+      const copied: Array<{ dx: number; dy: number; dz: number; material: number }> = [];
+      for (let x = x0; x <= x1; x++)
+        for (let y = y0; y <= y1; y++)
+          for (let z = z0; z <= z1; z++) {
+            const m = getBlockInWorld(world, { x, y, z });
+            if (m !== BLOCK_MATERIALS.AIR)
+              copied.push({ dx: x - x0, dy: y - y0, dz: z - z0, material: m });
+          }
+      if (!agentClipboards.has(client.id)) agentClipboards.set(client.id, new Map());
+      agentClipboards.get(client.id)!.set(label, copied);
+      send(client, { type: 'copy_ack', agentId: client.id, label, blockCount: copied.length });
+      console.log(`[action] copy_region ${copied.length} blocks → clipboard[${label}] by ${client.name}`);
+      return true;
+    }
+
+    case 'paste_region': {
+      const origin  = payload.origin as Vec3;
+      const label   = (payload.label as string | undefined) ?? 'default';
+      const flipX   = !!(payload.flipX);
+      const flipZ   = !!(payload.flipZ);
+      const rot     = ((payload.rotate90 as number | undefined) ?? 0) % 4;
+      const clipboard = agentClipboards.get(client.id)?.get(label);
+      if (!clipboard || clipboard.length === 0) {
+        send(client, { type: 'error', message: `No clipboard data for label "${label}"` });
+        return false;
+      }
+      // Find bounding box to support flip/rotate
+      const maxDx = Math.max(...clipboard.map(b => b.dx));
+      const maxDz = Math.max(...clipboard.map(b => b.dz));
+      let count = 0;
+      for (const b of clipboard) {
+        let dx = b.dx, dz = b.dz;
+        if (flipX) dx = maxDx - dx;
+        if (flipZ) dz = maxDz - dz;
+        for (let r = 0; r < rot; r++) { const tmp = dx; dx = dz; dz = maxDx - tmp; }
+        placeBlockInWorld(world, { x: origin.x + dx, y: origin.y + b.dy, z: origin.z + dz }, b.material);
+        count++;
+      }
+      send(client, { type: 'paste_ack', agentId: client.id, blockCount: count });
+      console.log(`[action] paste_region ${count} blocks at (${origin.x},${origin.y},${origin.z}) by ${client.name}`);
+      return true;
+    }
+
+    case 'set_label': {
+      const pos   = payload.position as Vec3;
+      const text  = String(payload.text ?? '').slice(0, MAX_LABEL_LEN);
+      const color = String(payload.color ?? '#ffffff');
+      const posKey = `${pos.x},${pos.y},${pos.z}`;
+      // Remove old label at same position if any
+      const oldId = world.labelsByPos.get(posKey);
+      if (oldId) { world.labels.delete(oldId); world.labelsByPos.delete(posKey); }
+      const label: WorldLabel = {
+        id: nanoid(),
+        position: pos,
+        text,
+        color,
+        agentId: client.id,
+        agentName: client.name,
+        createdAt: new Date().toISOString(),
+      };
+      world.labels.set(label.id, label);
+      world.labelsByPos.set(posKey, label.id);
+      broadcast(world.id, { type: 'label_set', label });
+      return true;
+    }
+
+    case 'remove_label': {
+      const pos = payload.position as Vec3;
+      const posKey = `${pos.x},${pos.y},${pos.z}`;
+      const labelId = world.labelsByPos.get(posKey);
+      if (!labelId) return false;
+      world.labels.delete(labelId);
+      world.labelsByPos.delete(posKey);
+      broadcast(world.id, { type: 'label_removed', labelId });
+      return true;
+    }
+
+    case 'agent_memo': {
+      const key   = String(payload.key ?? '').slice(0, 64);
+      const value = String(payload.value ?? '').slice(0, MAX_MEMO_LEN);
+      const ttl   = payload.ttl as number | undefined;
+      if (!agentMemos.has(client.id)) agentMemos.set(client.id, new Map());
+      agentMemos.get(client.id)!.set(key, {
+        value,
+        expiresAt: ttl ? Date.now() + ttl * 1000 : null,
+      });
+      send(client, { type: 'memo_ack', agentId: client.id, key });
       return true;
     }
 

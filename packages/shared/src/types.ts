@@ -114,6 +114,13 @@ export type ActionType =
   | 'place_block'
   | 'remove_block'
   | 'paint_block'
+  | 'fill_region'
+  | 'batch_place'
+  | 'copy_region'
+  | 'paste_region'
+  | 'set_label'
+  | 'remove_label'
+  | 'agent_memo'
   | 'spawn_entity'
   | 'delete_entity'
   | 'update_entity'
@@ -137,6 +144,13 @@ export type ActionPayload =
   | PlaceBlockPayload
   | RemoveBlockPayload
   | PaintBlockPayload
+  | FillRegionPayload
+  | BatchPlacePayload
+  | CopyRegionPayload
+  | PasteRegionPayload
+  | SetLabelPayload
+  | RemoveLabelPayload
+  | AgentMemoPayload
   | SpawnEntityPayload
   | DeleteEntityPayload
   | UpdateEntityPayload
@@ -200,6 +214,72 @@ export interface TerrainEditPayload {
   material?: BlockMaterialId;
 }
 
+/** Fill a rectangular region with one material. Max 32x32x32 = 32768 blocks per call. */
+export interface FillRegionPayload {
+  type: 'fill_region';
+  min: Vec3;
+  max: Vec3;
+  material: BlockMaterialId;
+}
+
+/** Place up to 2048 blocks in a single message. */
+export interface BatchPlacePayload {
+  type: 'batch_place';
+  blocks: Array<{ position: Vec3; material: BlockMaterialId }>;
+}
+
+/** Copy a region into the agent's clipboard (server-side, per-agent). */
+export interface CopyRegionPayload {
+  type: 'copy_region';
+  min: Vec3;
+  max: Vec3;
+  label?: string; // optional name for this clipboard slot
+}
+
+/** Paste the agent's clipboard at a new origin. */
+export interface PasteRegionPayload {
+  type: 'paste_region';
+  origin: Vec3;   // where min corner of copied region goes
+  label?: string; // which clipboard slot to paste
+  flipX?: boolean;
+  flipZ?: boolean;
+  rotate90?: number; // 0|1|2|3 clockwise 90° steps around Y axis
+}
+
+/** Attach a floating text label to a world position (visible to all observers). */
+export interface SetLabelPayload {
+  type: 'set_label';
+  position: Vec3;
+  text: string;       // max 120 chars
+  color?: string;     // hex e.g. '#ff0000'
+  agentId?: string;   // auto-filled server-side
+}
+
+/** Remove a label at a position. */
+export interface RemoveLabelPayload {
+  type: 'remove_label';
+  position: Vec3;
+}
+
+/** Agent stores a persistent key-value memo about the world (e.g. plans, observations). */
+export interface AgentMemoPayload {
+  type: 'agent_memo';
+  key: string;    // e.g. 'plan', 'zone_north', 'todo'
+  value: string;  // any string, max 4096 chars
+  ttl?: number;   // optional seconds until expiry (default: forever)
+}
+
+/** A label in the world */
+export interface WorldLabel {
+  id: string;
+  position: Vec3;
+  text: string;
+  color: string;
+  agentId: string;
+  agentName: string;
+  createdAt: string;
+}
+
 // ─── Proposals (agent changes requiring approval) ───
 export interface Proposal {
   id: string;
@@ -239,7 +319,13 @@ export type WSServerMessage =
   | { type: 'chat'; userId: string; name: string; message: string }
   | { type: 'error'; message: string }
   | { type: 'snapshot_created'; snapshotId: string; timestamp: string }
-  | { type: 'rollback_applied'; snapshotId: string; timestamp: string };
+  | { type: 'rollback_applied'; snapshotId: string; timestamp: string }
+  | { type: 'label_set'; label: WorldLabel }
+  | { type: 'label_removed'; labelId: string }
+  | { type: 'memo_ack'; agentId: string; key: string }
+  | { type: 'memo_data'; agentId: string; key: string; value: string | null }
+  | { type: 'copy_ack'; agentId: string; label: string; blockCount: number }
+  | { type: 'paste_ack'; agentId: string; blockCount: number };
 
 // ─── Agent API Types ───
 export interface AgentAuthRequest {
