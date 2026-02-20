@@ -301,7 +301,9 @@ export type WSClientMessage =
   | { type: 'action'; action: Omit<WorldAction, 'id' | 'timestamp' | 'status'> }
   | { type: 'request_chunk'; coord: ChunkCoord }
   | { type: 'cursor_update'; position: Vec3; tool: Tool }
-  | { type: 'chat'; message: string };
+  | { type: 'chat'; message: string }
+  | { type: 'get_memo'; key: string }
+  | { type: 'list_memos' };
 
 export type WSServerMessage =
   | { type: 'auth_ok'; userId: string; role: Role }

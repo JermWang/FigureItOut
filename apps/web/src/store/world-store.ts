@@ -10,6 +10,7 @@ import {
   type Vec3,
   type Entity,
   type WorldAction,
+  type WorldLabel,
   chunkKey,
   createGroundChunk,
   createEmptyChunk,
@@ -19,6 +20,8 @@ import {
   setBlock,
   getBlock,
 } from '@fio/shared';
+
+export type { WorldLabel };
 
 export interface ActivityItem {
   id: string;
@@ -70,7 +73,9 @@ interface WorldState {
   leftPanelOpen: boolean;
   selectedAgent: OnlineUser | null;
 
-  // Spectator
+  // Labels
+  labels: Map<string, WorldLabel>;
+
   // Actions
   setWorldId: (id: string) => void;
   setConnected: (v: boolean) => void;
@@ -104,6 +109,10 @@ interface WorldState {
   // Activity
   addActivity: (item: Omit<ActivityItem, 'id' | 'timestamp'>) => void;
 
+  // Labels
+  setLabel: (label: WorldLabel) => void;
+  removeLabel: (labelId: string) => void;
+
   // Initialization
   initializeWorld: () => void;
 }
@@ -126,6 +135,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   showAgentModal: false,
   leftPanelOpen: true,
   selectedAgent: null,
+  labels: new Map(),
 
   setWorldId: (id) => set({ worldId: id }),
   setConnected: (v) => set({ connected: v }),
@@ -209,6 +219,22 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     set((s) => ({
       onlineUsers: s.onlineUsers.map((u) => (u.id === id ? { ...u, ...changes } : u)),
     }));
+  },
+
+  setLabel: (label: WorldLabel) => {
+    set((s) => {
+      const next = new Map(s.labels);
+      next.set(label.id, label);
+      return { labels: next };
+    });
+  },
+
+  removeLabel: (labelId: string) => {
+    set((s) => {
+      const next = new Map(s.labels);
+      next.delete(labelId);
+      return { labels: next };
+    });
   },
 
   addActivity: (item: Omit<ActivityItem, 'id' | 'timestamp'>) => {

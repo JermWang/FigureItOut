@@ -304,6 +304,31 @@ function handleMessage(client: Client, raw: string) {
       break;
     }
 
+    case 'get_memo': {
+      const key = String((msg as unknown as { key: string }).key ?? '').slice(0, 64);
+      const memos = agentMemos.get(client.id);
+      const entry = memos?.get(key);
+      const now = Date.now();
+      const value = entry && (entry.expiresAt === null || entry.expiresAt > now)
+        ? entry.value
+        : null;
+      send(client, { type: 'memo_data', agentId: client.id, key, value });
+      break;
+    }
+
+    case 'list_memos': {
+      const memos = agentMemos.get(client.id);
+      const now = Date.now();
+      const keys: string[] = [];
+      if (memos) {
+        for (const [k, v] of memos) {
+          if (v.expiresAt === null || v.expiresAt > now) keys.push(k);
+        }
+      }
+      send(client, { type: 'memo_data', agentId: client.id, key: '__list__', value: JSON.stringify(keys) });
+      break;
+    }
+
     default:
       send(client, { type: 'error', message: `Unknown message type` });
   }
