@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       entityCount: world._count.entities,
       onlineUsers: 0, // STUB: would query WS server
       onlineAgents: 0,
-      loadedChunks: chunks.map((c) => ({ cx: c.cx, cy: c.cy, cz: c.cz })),
+      loadedChunks: chunks.map((c: { cx: number; cy: number; cz: number }) => ({ cx: c.cx, cy: c.cy, cz: c.cz })),
     });
   } catch (error) {
     console.error('[agent/world/state] Error:', error);
