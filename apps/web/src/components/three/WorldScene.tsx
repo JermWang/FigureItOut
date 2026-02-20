@@ -31,7 +31,7 @@ function SceneContent({ onBlockClick }: { onBlockClick: () => void }) {
   return (
     <>
       <color attach="background" args={['#87CEEB']} />
-      <fog attach="fog" args={['#87CEEB', 180, 320]} />
+      <fog attach="fog" args={['#87CEEB', 80, 160]} />
 
       <ambientLight intensity={0.5} />
       <hemisphereLight args={['#87CEEB', '#4E8B2E', 0.55]} />
@@ -105,7 +105,7 @@ export default function WorldScene() {
 
   return (
     <Canvas
-      camera={{ position: [80, 45, 80], fov: 65, near: 0.1, far: 2000 }}
+      camera={{ position: [80, 45, 80], fov: 65, near: 0.1, far: 1200 }}
       gl={{ antialias: true, alpha: false }}
       dpr={[1, 2]}
     >

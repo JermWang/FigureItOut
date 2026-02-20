@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import React from 'react';
 import * as THREE from 'three';
 
 // Simple pseudo-noise for gentle rolling hills
@@ -76,13 +76,27 @@ const SNOW_C  = new THREE.Color('#F0F4FF');
 const GLOW_A  = new THREE.Color('#FFE066');
 const GLOW_B  = new THREE.Color('#FF9A22');
 
-const EXTENT = 140;
+const EXTENT = 200;
 const WATER_LEVEL = -2;  // Lower so hills/fields are exposed, only deep valleys have water
 const SNOW_LEVEL  = 17;  // Higher so only true mountain peaks get snow
 
 interface BlockData { x: number; y: number; z: number; color: THREE.Color }
 
-function generateTerrain(): { blocks: BlockData[]; waterBlocks: BlockData[] } {
+// ─── Tile geometry builder ───
+const TILE = 40; // blocks per tile side
+
+const FACES_DEF = [
+  { dir: [1, 0, 0] as [number,number,number], corners: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] as [number,number,number][] },
+  { dir: [-1, 0, 0] as [number,number,number], corners: [[0,1,0],[0,0,0],[0,0,1],[0,1,1]] as [number,number,number][] },
+  { dir: [0, 1, 0] as [number,number,number], corners: [[0,1,1],[1,1,1],[1,1,0],[0,1,0]] as [number,number,number][] },
+  { dir: [0, -1, 0] as [number,number,number], corners: [[0,0,0],[1,0,0],[1,0,1],[0,0,1]] as [number,number,number][] },
+  { dir: [0, 0, 1] as [number,number,number], corners: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]] as [number,number,number][] },
+  { dir: [0, 0, -1] as [number,number,number], corners: [[1,0,0],[0,0,0],[0,1,0],[1,1,0]] as [number,number,number][] },
+];
+
+function generateTile(tileX: number, tileZ: number): { solidGeo: THREE.BufferGeometry; waterGeo: THREE.BufferGeometry } {
+  const x0 = tileX * TILE;
+  const z0 = tileZ * TILE;
   const blocks: BlockData[] = [];
   const waterBlocks: BlockData[] = [];
   const solidSet = new Set<string>();
@@ -94,20 +108,23 @@ function generateTerrain(): { blocks: BlockData[]; waterBlocks: BlockData[] } {
     blocks.push({ x, y, z, color });
   }
 
-  // Grid-based tree placement: one candidate per TREE_GRID cell, only in hilly zones
+  // Trees for this tile
   const TREE_GRID = 14;
+  const treeSet = new Set<string>();
+  const gxMin = Math.floor((x0 - TREE_GRID) / TREE_GRID);
+  const gxMax = Math.ceil((x0 + TILE + TREE_GRID) / TREE_GRID);
+  const gzMin = Math.floor((z0 - TREE_GRID) / TREE_GRID);
+  const gzMax = Math.ceil((z0 + TILE + TREE_GRID) / TREE_GRID);
   const treePositions: { x: number; z: number; h: number; pine: boolean }[] = [];
-  for (let gx = Math.floor(-EXTENT / TREE_GRID); gx <= Math.ceil(EXTENT / TREE_GRID); gx++) {
-    for (let gz = Math.floor(-EXTENT / TREE_GRID); gz <= Math.ceil(EXTENT / TREE_GRID); gz++) {
-      // Jittered position within cell
+
+  for (let gx = gxMin; gx <= gxMax; gx++) {
+    for (let gz = gzMin; gz <= gzMax; gz++) {
       const tx = gx * TREE_GRID + Math.floor(hash(gx * 7919, gz * 6271) * TREE_GRID);
       const tz = gz * TREE_GRID + Math.floor(hash(gx * 3571, gz * 9241) * TREE_GRID);
       if (tx < -EXTENT || tx > EXTENT || tz < -EXTENT || tz > EXTENT) continue;
-      if (Math.abs(tx) < 20 && Math.abs(tz) < 20) continue; // keep center clear
-      // Skip flat zones — keep them open for agents to build
+      if (Math.abs(tx) < 20 && Math.abs(tz) < 20) continue;
       const flatMask = smoothNoise(tx * 0.019 + 5.7, tz * 0.019 + 3.1);
       if (flatMask < 0.55) continue;
-      // Only 40% of grid cells get a tree (further thinning)
       if (hash(gx * 1301, gz * 8923) > 0.4) continue;
       const th = terrainHeight(tx, tz);
       if (th < WATER_LEVEL || th >= SNOW_LEVEL) continue;
@@ -117,16 +134,16 @@ function generateTerrain(): { blocks: BlockData[]; waterBlocks: BlockData[] } {
     }
   }
 
-  for (let x = -EXTENT; x <= EXTENT; x++) {
-    for (let z = -EXTENT; z <= EXTENT; z++) {
+  for (let x = x0; x < x0 + TILE; x++) {
+    for (let z = z0; z < z0 + TILE; z++) {
+      if (x < -EXTENT || x > EXTENT || z < -EXTENT || z > EXTENT) continue;
       let h = terrainHeight(x, z);
       const river = isRiver(x, z);
-      // River only carves where terrain is low enough
       if (river && h <= WATER_LEVEL + 5) h = WATER_LEVEL - 3;
 
       const onGrass = h >= WATER_LEVEL && !river;
       const onSnow  = h >= SNOW_LEVEL;
-      const onStone = h >= SNOW_LEVEL - 4; // wider stone band below snow
+      const onStone = h >= SNOW_LEVEL - 4;
 
       for (let y = -6; y <= h; y++) {
         let color: THREE.Color;
@@ -167,12 +184,9 @@ function generateTerrain(): { blocks: BlockData[]; waterBlocks: BlockData[] } {
         }
       }
 
-      // Scattered flowers — very sparse
       if (onGrass && !onStone && !river && hash(x * 53, z * 97) > 0.992) {
         addBlock(x, h + 1, z, FLOWER_COLORS[Math.floor(hash(x * 41, z * 67) * FLOWER_COLORS.length)].clone());
       }
-
-      // Rare mushrooms near water
       if (onGrass && h <= WATER_LEVEL + 4 && !river && hash(x * 71, z * 113) > 0.997) {
         addBlock(x, h + 1, z, MUSH_STEM.clone());
         const capC = MUSH_CAPS[Math.floor(hash(x * 29, z * 43) * MUSH_CAPS.length)];
@@ -184,7 +198,12 @@ function generateTerrain(): { blocks: BlockData[]; waterBlocks: BlockData[] } {
     }
   }
 
+  // Trees whose trunk falls in this tile
   for (const tree of treePositions) {
+    if (tree.x < x0 - 4 || tree.x >= x0 + TILE + 4 || tree.z < z0 - 4 || tree.z >= z0 + TILE + 4) continue;
+    const key = `${tree.x},${tree.z}`;
+    if (treeSet.has(key)) continue;
+    treeSet.add(key);
     if (tree.pine) {
       const trunkH = 5 + Math.floor(hash(tree.x * 13, tree.z * 29) * 4);
       for (let y = tree.h + 1; y <= tree.h + trunkH; y++) addBlock(tree.x, y, tree.z, TRUNK_B.clone());
@@ -216,70 +235,78 @@ function generateTerrain(): { blocks: BlockData[]; waterBlocks: BlockData[] } {
     }
   }
 
-  return { blocks, waterBlocks };
+  const allSet = new Set<string>([...solidSet, ...new Set<string>(waterBlocks.map(b => `${b.x},${b.y},${b.z}`))]);
+
+  function buildGeo(data: BlockData[], cullSet: Set<string>) {
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const colors: number[] = [];
+    const indices: number[] = [];
+    let vc = 0;
+    for (const block of data) {
+      for (const face of FACES_DEF) {
+        const nx = block.x + face.dir[0];
+        const ny = block.y + face.dir[1];
+        const nz = block.z + face.dir[2];
+        if (cullSet.has(`${nx},${ny},${nz}`)) continue;
+        for (const corner of face.corners) {
+          positions.push(block.x + corner[0], block.y + corner[1], block.z + corner[2]);
+          normals.push(face.dir[0], face.dir[1], face.dir[2]);
+          colors.push(block.color.r, block.color.g, block.color.b);
+        }
+        indices.push(vc, vc + 1, vc + 2, vc, vc + 2, vc + 3);
+        vc += 4;
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.setIndex(indices);
+    geo.computeBoundingSphere();
+    return geo;
+  }
+
+  return {
+    solidGeo: buildGeo(blocks, allSet),
+    waterGeo: buildGeo(waterBlocks, allSet),
+  };
 }
 
+interface TileGeo { key: string; solidGeo: THREE.BufferGeometry; waterGeo: THREE.BufferGeometry }
+
 export default function SandboxTerrain() {
-  const { solidGeo, waterGeo } = useMemo(() => {
-    const { blocks, waterBlocks } = generateTerrain();
+  const [tiles, setTiles] = React.useState<TileGeo[]>([]);
 
-    // Combined set for cross-mesh face culling (solid blocks cull water faces and vice versa)
-    const solidSet = new Set<string>(blocks.map(b => `${b.x},${b.y},${b.z}`));
-    const waterSet = new Set<string>(waterBlocks.map(b => `${b.x},${b.y},${b.z}`));
-    const allSet  = new Set<string>([...solidSet, ...waterSet]);
+  React.useEffect(() => {
+    const tileMin = Math.floor(-EXTENT / TILE);
+    const tileMax = Math.ceil(EXTENT / TILE);
+    const queue: [number, number][] = [];
 
-    function buildGeometry(data: BlockData[], cullSet: Set<string>) {
-      const positions: number[] = [];
-      const normals: number[] = [];
-      const colors: number[] = [];
-      const indices: number[] = [];
-      let vc = 0;
-
-      const blockSet = new Set<string>();
-      for (const b of data) {
-        blockSet.add(`${b.x},${b.y},${b.z}`);
+    // Sort tiles by distance from origin so center loads first
+    for (let tx = tileMin; tx <= tileMax; tx++) {
+      for (let tz = tileMin; tz <= tileMax; tz++) {
+        queue.push([tx, tz]);
       }
+    }
+    queue.sort((a, b) => (a[0] * a[0] + a[1] * a[1]) - (b[0] * b[0] + b[1] * b[1]));
 
-      const FACES = [
-        { dir: [1, 0, 0], corners: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] },
-        { dir: [-1, 0, 0], corners: [[0,1,0],[0,0,0],[0,0,1],[0,1,1]] },
-        { dir: [0, 1, 0], corners: [[0,1,1],[1,1,1],[1,1,0],[0,1,0]] },
-        { dir: [0, -1, 0], corners: [[0,0,0],[1,0,0],[1,0,1],[0,0,1]] },
-        { dir: [0, 0, 1], corners: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]] },
-        { dir: [0, 0, -1], corners: [[1,0,0],[0,0,0],[0,1,0],[1,1,0]] },
-      ];
+    let idx = 0;
+    const BATCH = 4; // tiles per frame
 
-      for (const block of data) {
-        for (const face of FACES) {
-          const nx = block.x + face.dir[0];
-          const ny = block.y + face.dir[1];
-          const nz = block.z + face.dir[2];
-          if (cullSet.has(`${nx},${ny},${nz}`)) continue;
-
-          for (const corner of face.corners) {
-            positions.push(block.x + corner[0], block.y + corner[1], block.z + corner[2]);
-            normals.push(face.dir[0], face.dir[1], face.dir[2]);
-            colors.push(block.color.r, block.color.g, block.color.b);
-          }
-
-          indices.push(vc, vc + 1, vc + 2, vc, vc + 2, vc + 3);
-          vc += 4;
-        }
+    function processBatch() {
+      if (idx >= queue.length) return;
+      const batch: TileGeo[] = [];
+      for (let i = 0; i < BATCH && idx < queue.length; i++, idx++) {
+        const [tx, tz] = queue[idx];
+        const { solidGeo, waterGeo } = generateTile(tx, tz);
+        batch.push({ key: `${tx},${tz}`, solidGeo, waterGeo });
       }
-
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-      geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-      geo.setIndex(indices);
-      geo.computeBoundingSphere();
-      return geo;
+      setTiles(prev => [...prev, ...batch]);
+      setTimeout(processBatch, 0);
     }
 
-    return {
-      solidGeo: buildGeometry(blocks, allSet),
-      waterGeo: buildGeometry(waterBlocks, allSet),
-    };
+    processBatch();
   }, []);
 
   return (
@@ -289,17 +316,16 @@ export default function SandboxTerrain() {
         <planeGeometry args={[2000, 2000]} />
         <meshStandardMaterial color="#4E8B2E" />
       </mesh>
-      <mesh geometry={solidGeo}>
-        <meshStandardMaterial vertexColors side={THREE.FrontSide} />
-      </mesh>
-      <mesh geometry={waterGeo}>
-        <meshStandardMaterial
-          vertexColors
-          transparent
-          opacity={0.55}
-          side={THREE.FrontSide}
-        />
-      </mesh>
+      {tiles.map(tile => (
+        <React.Fragment key={tile.key}>
+          <mesh geometry={tile.solidGeo}>
+            <meshStandardMaterial vertexColors side={THREE.FrontSide} />
+          </mesh>
+          <mesh geometry={tile.waterGeo}>
+            <meshStandardMaterial vertexColors transparent opacity={0.55} side={THREE.FrontSide} />
+          </mesh>
+        </React.Fragment>
+      ))}
     </group>
   );
 }
