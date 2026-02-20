@@ -11,6 +11,7 @@ import AgentModal from '@/components/ui/AgentModal';
 import AgentInfoPanel from '@/components/ui/AgentInfoPanel';
 import ModeSelector from '@/components/ui/ModeSelector';
 import MobileControls from '@/components/ui/MobileControls';
+import ObserverPanel from '@/components/ui/ObserverPanel';
 import { Sparkles, Bot, Eye, Box, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { playCommandOpen, playHover, playModalOpen, playNotification } from '@/lib/sounds';
@@ -60,6 +61,7 @@ export default function HomePage() {
       >
         <LeftPanel />
         <AgentInfoPanel />
+        <ObserverPanel />
 
         {/* Top bar — fun & minimal */}
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
