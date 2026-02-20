@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useWorldStore } from '@/store/world-store';
+import { playIntroDismiss, playClick, playHover } from '@/lib/sounds';
 import { Rocket, Gamepad2, Wand2, Box, Bot, Blocks, Zap, Globe, Cpu, FileText, Palette } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -16,6 +17,7 @@ export default function IntroOverlay() {
   const agentCount = onlineUsers.filter((u) => u.type === 'agent').length;
 
   const handleStart = () => {
+    playIntroDismiss();
     setExiting(true);
     setTimeout(() => {
       dismissIntro();
@@ -87,6 +89,7 @@ export default function IntroOverlay() {
             {/* Big fun CTA */}
             <button
               onClick={handleStart}
+              onMouseEnter={() => playHover()}
               className="group btn-candy w-full py-4 rounded-2xl text-white font-bold text-base tracking-wide flex items-center justify-center gap-2.5"
             >
               <Rocket className="w-5 h-5 transition-transform group-hover:-rotate-12 group-hover:scale-110" />
@@ -98,6 +101,8 @@ export default function IntroOverlay() {
             <a
               href="/skills.md"
               target="_blank"
+              onMouseEnter={() => playHover()}
+              onClick={() => playClick()}
               className="group flex items-center justify-center gap-2 w-full mt-3 py-2.5 rounded-xl border border-fio-accent/30 bg-fio-accent/5 hover:bg-fio-accent/10 hover:border-fio-accent/60 transition-all text-xs text-fio-accent font-medium"
             >
               <FileText className="w-3.5 h-3.5" />

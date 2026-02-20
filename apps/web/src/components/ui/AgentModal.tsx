@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useWorldStore } from '@/store/world-store';
 import { X, Copy, Check, Bot, Hammer, Eye, Shield, Key, PartyPopper, AlertTriangle } from 'lucide-react';
 import { ROLES } from '@fio/shared';
+import { playModalOpen, playModalClose, playSuccess, playCopy, playClick, playHover } from '@/lib/sounds';
 
 export default function AgentModal() {
   const showAgentModal = useWorldStore((s) => s.showAgentModal);
@@ -19,7 +20,11 @@ export default function AgentModal() {
 
   if (!showAgentModal) return null;
 
+  // Play open sound once on mount — handled via useEffect in parent, but we can play inline on first render
+  // (sound is triggered by the button that opens this modal)
+
   const handleCreate = async () => {
+    playSuccess();
     const fakeKey = `fio_agent_${crypto.randomUUID().replace(/-/g, '').slice(0, 32)}`;
     setGeneratedKey(fakeKey);
     addActivity({
@@ -32,6 +37,7 @@ export default function AgentModal() {
 
   const handleCopy = () => {
     if (generatedKey) {
+      playCopy();
       navigator.clipboard.writeText(generatedKey);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -39,6 +45,7 @@ export default function AgentModal() {
   };
 
   const handleClose = () => {
+    playModalClose();
     setShowAgentModal(false);
     setName('');
     setRole(ROLES.AGENT);
@@ -49,7 +56,7 @@ export default function AgentModal() {
   };
 
   return (
-    <div className="cmd-overlay flex items-center justify-center" onClick={handleClose}>
+    <div className="cmd-overlay flex items-center justify-center" onClick={handleClose} onMouseEnter={() => {}}>
       <div
         className="glass rounded-2xl w-full max-w-md shadow-2xl glow-border overflow-hidden animate-pop-in"
         onClick={(e) => e.stopPropagation()}
@@ -62,7 +69,7 @@ export default function AgentModal() {
             <Bot className="w-5 h-5 text-fio-accent" />
             <h2 className="text-sm font-bold">plug in a bot</h2>
           </div>
-          <button onClick={handleClose} className="text-fio-muted/50 hover:text-white transition-colors">
+          <button onClick={handleClose} onMouseEnter={() => playHover()} className="text-fio-muted/50 hover:text-white transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -103,7 +110,7 @@ export default function AgentModal() {
                   <p className="text-[10px] text-fio-muted/50">you approve every move</p>
                 </div>
                 <button
-                  onClick={() => setProposalMode(!proposalMode)}
+                  onClick={() => { playClick(); setProposalMode(!proposalMode); }}
                   className={`w-10 h-5 rounded-full transition-all relative ${proposalMode ? 'bg-fio-accent shadow-[0_0_8px_rgba(167,139,250,0.3)]' : 'bg-fio-border'}`}
                 >
                   <span
@@ -127,6 +134,7 @@ export default function AgentModal() {
 
               <button
                 onClick={handleCreate}
+                onMouseEnter={() => playHover()}
                 className="w-full btn-candy py-3 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-2"
               >
                 <Key className="w-4 h-4" /> generate key

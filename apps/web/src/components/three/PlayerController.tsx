@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { usePlayerStore } from '@/store/player-store';
+import { playFootstep, playJump, playLand } from '@/lib/sounds';
 
 const WALK_SPEED   = 6;
 const SPRINT_SPEED = 12;
@@ -46,6 +47,9 @@ export default function PlayerController() {
   const velYRef  = useRef(velocityY);
   const movingRef = useRef(false);
   const lockedRef = useRef(false);
+  const footstepTimerRef = useRef(0);
+  const wasOnGroundRef = useRef(true);
+  const wasAirborneRef = useRef(false);
 
   // Mobile touch refs
   const joystickRef = useRef<{ dx: number; dz: number }>({ dx: 0, dz: 0 });
@@ -127,6 +131,17 @@ export default function PlayerController() {
       const dz = (Math.cos(angle) * moveZ - Math.sin(angle) * moveX) * speed * delta;
       posRef.current.x += dx;
       posRef.current.z -= dz;
+
+      // Footstep sounds — only in walk mode on ground
+      if (mode === 'walk') {
+        footstepTimerRef.current -= delta;
+        if (footstepTimerRef.current <= 0) {
+          playFootstep();
+          footstepTimerRef.current = sprint ? 0.28 : 0.42;
+        }
+      }
+    } else {
+      footstepTimerRef.current = 0;
     }
 
     if (mode === 'fly') {
@@ -144,13 +159,21 @@ export default function PlayerController() {
 
       if (posRef.current.y <= groundY) {
         posRef.current.y = groundY;
+        // Land sound when hitting ground after being airborne
+        if (wasAirborneRef.current) {
+          playLand();
+          wasAirborneRef.current = false;
+        }
         velYRef.current  = 0;
         setOnGround(true);
         if (k.has('Space')) {
           velYRef.current = JUMP_VEL;
+          playJump();
           setOnGround(false);
+          wasAirborneRef.current = true;
         }
       } else {
+        wasAirborneRef.current = true;
         setOnGround(false);
       }
     }

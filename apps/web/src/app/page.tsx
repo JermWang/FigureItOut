@@ -13,6 +13,7 @@ import ModeSelector from '@/components/ui/ModeSelector';
 import MobileControls from '@/components/ui/MobileControls';
 import { Sparkles, Bot, Eye, Box, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
+import { playCommandOpen, playHover, playModalOpen, playNotification } from '@/lib/sounds';
 
 const WorldScene = dynamic(() => import('@/components/three/WorldScene'), {
   ssr: false,
@@ -88,7 +89,8 @@ export default function HomePage() {
             <div className="w-px h-3.5 bg-fio-border" />
 
             <button
-              onClick={() => setShowCommandBar(true)}
+              onClick={() => { playCommandOpen(); setShowCommandBar(true); }}
+              onMouseEnter={() => playHover()}
               className="flex items-center gap-1 text-[10px] text-fio-muted hover:text-fio-accent transition-colors"
             >
               <Sparkles className="w-3 h-3" />

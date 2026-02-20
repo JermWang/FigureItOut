@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWorldStore } from '@/store/world-store';
 import { Home, Gift, Bot, Camera, Undo2, Sparkles, Search } from 'lucide-react';
+import { playCommandOpen, playCommandClose, playClick, playHover, playSuccess } from '@/lib/sounds';
 
 interface Command {
   id: string;
@@ -72,9 +73,11 @@ export default function CommandBar() {
     (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
+        if (!showCommandBar) playCommandOpen(); else playCommandClose();
         setShowCommandBar(!showCommandBar);
       }
       if (e.key === 'Escape') {
+        playCommandClose();
         setShowCommandBar(false);
       }
     },
@@ -89,7 +92,7 @@ export default function CommandBar() {
   if (!showCommandBar) return null;
 
   return (
-    <div className="cmd-overlay flex items-start justify-center pt-[18vh]" onClick={() => setShowCommandBar(false)}>
+    <div className="cmd-overlay flex items-start justify-center pt-[18vh]" onClick={() => { playCommandClose(); setShowCommandBar(false); }}>
       <div
         className="glass rounded-2xl w-full max-w-md shadow-2xl glow-border overflow-hidden animate-pop-in"
         onClick={(e) => e.stopPropagation()}
@@ -120,10 +123,12 @@ export default function CommandBar() {
               <button
                 key={cmd.id}
                 onClick={() => {
+                  playSuccess();
                   cmd.action();
                   setShowCommandBar(false);
                   setQuery('');
                 }}
+                onMouseEnter={() => playHover()}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-fio-accent/10 text-fio-text transition-all text-left group"
               >
                 <span className="text-fio-accent group-hover:scale-110 transition-transform">{cmd.icon}</span>

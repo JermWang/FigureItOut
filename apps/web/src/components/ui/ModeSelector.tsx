@@ -3,6 +3,7 @@
 import { usePlayerStore } from '@/store/player-store';
 import { Footprints, Plane, Bot, User, Eye } from 'lucide-react';
 import clsx from 'clsx';
+import { playClick, playHover, playModeSwitch, playFlyStart, playAvatarSelect } from '@/lib/sounds';
 
 const WALK_KEYS = [
   { key: 'WASD', desc: 'move' },
@@ -50,7 +51,8 @@ export default function ModeSelector() {
 
         {/* Explore toggle */}
         <button
-          onClick={() => setActive(!active)}
+          onClick={() => { playClick(); setActive(!active); }}
+          onMouseEnter={() => playHover()}
           className={clsx(
             'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all',
             active
@@ -67,7 +69,8 @@ export default function ModeSelector() {
         {/* Walk / Fly toggle */}
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setMode('walk')}
+            onClick={() => { playModeSwitch(); setMode('walk'); }}
+            onMouseEnter={() => playHover()}
             className={clsx(
               'flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs transition-all',
               mode === 'walk' && active
@@ -79,7 +82,8 @@ export default function ModeSelector() {
             walk
           </button>
           <button
-            onClick={() => setMode('fly')}
+            onClick={() => { playFlyStart(); setMode('fly'); }}
+            onMouseEnter={() => playHover()}
             className={clsx(
               'flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs transition-all',
               mode === 'fly' && active
@@ -97,7 +101,8 @@ export default function ModeSelector() {
         {/* Avatar type */}
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setAvatarType('human')}
+            onClick={() => { playAvatarSelect(); setAvatarType('human'); }}
+            onMouseEnter={() => playHover()}
             title="Human avatar"
             className={clsx(
               'p-1.5 rounded-lg transition-all',
@@ -107,7 +112,8 @@ export default function ModeSelector() {
             <User className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => setAvatarType('agent')}
+            onClick={() => { playAvatarSelect(); setAvatarType('agent'); }}
+            onMouseEnter={() => playHover()}
             title="Agent avatar"
             className={clsx(
               'p-1.5 rounded-lg transition-all',
