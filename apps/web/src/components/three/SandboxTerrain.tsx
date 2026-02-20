@@ -42,9 +42,21 @@ function terrainHeight(x: number, z: number): number {
   const hillScale = isFlat ? flatMask / 0.55 * 0.08 : 1.0;
 
   const hills = (large + medium + fine) * hillScale;
-  // Ridge only in hilly zones, not suppressed in mid-range
   const ridgeScaled = isFlat ? 0 : ridge;
-  return Math.floor(hills + ridgeScaled);
+  let h = hills + ridgeScaled;
+
+  // Smooth radial center meadow — flatten within r=30, blend out to r=70
+  const dist = Math.sqrt(x * x + z * z);
+  const innerR = 30;
+  const outerR = 70;
+  if (dist < outerR) {
+    const t = dist < innerR ? 0 : (dist - innerR) / (outerR - innerR);
+    // Smoothstep blend
+    const blend = t * t * (3 - 2 * t);
+    h = h * blend;
+  }
+
+  return Math.floor(h);
 }
 
 function isRiver(x: number, z: number): boolean {
@@ -122,7 +134,9 @@ function generateTile(tileX: number, tileZ: number): { solidGeo: THREE.BufferGeo
       const tx = gx * TREE_GRID + Math.floor(hash(gx * 7919, gz * 6271) * TREE_GRID);
       const tz = gz * TREE_GRID + Math.floor(hash(gx * 3571, gz * 9241) * TREE_GRID);
       if (tx < -EXTENT || tx > EXTENT || tz < -EXTENT || tz > EXTENT) continue;
-      if (Math.abs(tx) < 20 && Math.abs(tz) < 20) continue;
+      // Keep center meadow clear of trees — smooth circular falloff
+      const treeDist = Math.sqrt(tx * tx + tz * tz);
+      if (treeDist < 55) continue;
       const flatMask = smoothNoise(tx * 0.019 + 5.7, tz * 0.019 + 3.1);
       if (flatMask < 0.55) continue;
       if (hash(gx * 1301, gz * 8923) > 0.4) continue;
