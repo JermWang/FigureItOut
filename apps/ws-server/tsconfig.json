@@ -2,14 +2,14 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "../../",
+    "rootDir": "./src",
     "module": "CommonJS",
     "moduleResolution": "node",
     "target": "ES2022",
     "paths": {
-      "@fio/shared": ["../../packages/shared/src/index.ts"],
-      "@fio/shared/*": ["../../packages/shared/src/*"]
+      "@fio/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@fio/shared/*": ["../../packages/shared/dist/*"]
     }
   },
-  "include": ["src/**/*", "../../packages/shared/src/**/*"]
+  "include": ["src/**/*"]
 }
