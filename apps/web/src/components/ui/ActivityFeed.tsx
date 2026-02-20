@@ -8,7 +8,7 @@ export default function ActivityFeed() {
   const activityFeed = useWorldStore((s) => s.activityFeed);
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 w-full max-w-md px-4 pointer-events-none">
+    <div className="w-full max-w-md px-4 pointer-events-none">
       <div className="glass rounded-2xl max-h-44 overflow-hidden pointer-events-auto glow-border">
         <div className="rainbow-bar" />
         <div className="flex items-center gap-2 px-4 py-2">

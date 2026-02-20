@@ -59,7 +59,6 @@ export default function HomePage() {
         )}
       >
         <LeftPanel />
-        <ActivityFeed />
         <AgentInfoPanel />
 
         {/* Top bar — fun & minimal */}
@@ -102,8 +101,13 @@ export default function HomePage() {
         <AgentModal />
       </div>
 
-      {/* Explore mode HUD — always visible after intro */}
-      {!introVisible && <ModeSelector />}
+      {/* Bottom-center stack: ModeSelector above ActivityFeed */}
+      {!introVisible && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+          <ModeSelector />
+          <ActivityFeed />
+        </div>
+      )}
       {!introVisible && <MobileControls />}
     </div>
   );

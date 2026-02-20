@@ -32,7 +32,7 @@ export default function ModeSelector() {
   const keys = mode === 'walk' ? WALK_KEYS : FLY_KEYS;
 
   return (
-    <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
+    <div className="flex flex-col items-center gap-2">
       {/* Controls hint — only when active */}
       {active && (
         <div className="flex items-center gap-2 flex-wrap justify-center">
