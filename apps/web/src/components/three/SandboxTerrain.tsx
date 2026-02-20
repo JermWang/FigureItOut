@@ -36,10 +36,10 @@ function terrainHeight(x: number, z: number): number {
   // Stronger ridge — peaks up to ~28 blocks
   const ridge  = Math.max(0, smoothNoise(x * 0.011 + 1.3, z * 0.011) - 0.38) * 32;
 
-  // Flatness mask: values < 0.38 = wide open flat fields (~35% of map)
+  // Flatness mask: values < 0.45 = wide open flat fields (~45% of map)
   const flatMask = smoothNoise(x * 0.019 + 5.7, z * 0.019 + 3.1);
-  const isFlat   = flatMask < 0.38;
-  const hillScale = isFlat ? flatMask / 0.38 * 0.12 : 1.0;
+  const isFlat   = flatMask < 0.45;
+  const hillScale = isFlat ? flatMask / 0.45 * 0.12 : 1.0;
 
   const hills = (large + medium + fine) * hillScale;
   // Ridge only in hilly zones, not suppressed in mid-range
@@ -148,19 +148,20 @@ function generateTerrain(): { blocks: BlockData[]; waterBlocks: BlockData[] } {
 
       if (onGrass && !onStone && !river) {
         const isPine = h >= SNOW_LEVEL - 6;
-        if (hash(x * 17, z * 31) > (isPine ? 0.91 : 0.925) && (Math.abs(x) > 8 || Math.abs(z) > 8)) {
-          const minD = isPine ? 3 : 4;
+        // Sparse trees — only ~2-3% of valid spots, with wide spacing
+        if (hash(x * 17, z * 31) > (isPine ? 0.97 : 0.98) && (Math.abs(x) > 8 || Math.abs(z) > 8)) {
+          const minD = isPine ? 6 : 8;
           if (!treePositions.some((t) => Math.abs(t.x - x) < minD && Math.abs(t.z - z) < minD)) {
             treePositions.push({ x, z, h, pine: isPine });
           }
         }
       }
 
-      if (onGrass && !onStone && !river && hash(x * 53, z * 97) > 0.955) {
+      if (onGrass && !onStone && !river && hash(x * 53, z * 97) > 0.98) {
         addBlock(x, h + 1, z, FLOWER_COLORS[Math.floor(hash(x * 41, z * 67) * FLOWER_COLORS.length)].clone());
       }
 
-      if (onGrass && h <= WATER_LEVEL + 4 && !river && hash(x * 71, z * 113) > 0.975) {
+      if (onGrass && h <= WATER_LEVEL + 4 && !river && hash(x * 71, z * 113) > 0.992) {
         addBlock(x, h + 1, z, MUSH_STEM.clone());
         const capC = MUSH_CAPS[Math.floor(hash(x * 29, z * 43) * MUSH_CAPS.length)];
         for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
