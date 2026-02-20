@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "postinstall": "cd apps/web && npx prisma generate",
     "lint": "turbo lint",
     "db:generate": "cd apps/web && npx prisma generate",
     "db:push": "cd apps/web && npx prisma db push",
