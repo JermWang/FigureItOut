@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { nanoid } from 'nanoid';
 
+export const dynamic = 'force-dynamic';
+
 // POST /api/agent/world/patch — Apply a world diff/patch
 export async function POST(req: NextRequest) {
   try {

@@ -4,6 +4,8 @@ import { rateLimit } from '@/lib/rate-limit';
 import { nanoid } from 'nanoid';
 import crypto from 'crypto';
 
+export const dynamic = 'force-dynamic';
+
 // POST /api/agent/keys — Create a new agent API key
 export async function POST(req: NextRequest) {
   try {
