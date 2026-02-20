@@ -335,7 +335,12 @@ function handleMessage(client: Client, raw: string) {
 }
 
 // ─── Block helpers ───
-function placeBlockInWorld(world: WorldState, pos: Vec3, material: number): void {
+function placeBlockInWorld(
+  world: WorldState,
+  pos: Vec3,
+  material: number,
+  dirtyKeys?: Set<string>,
+): void {
   const coord = worldToChunk(pos);
   const key = chunkKey(coord);
   let chunk = world.chunks.get(key);
@@ -345,6 +350,14 @@ function placeBlockInWorld(world: WorldState, pos: Vec3, material: number): void
   }
   const local = worldToLocal(pos);
   setBlock(chunk, local.x, local.y, local.z, material);
+  dirtyKeys?.add(key);
+}
+
+function broadcastDirtyChunks(world: WorldState, dirtyKeys: Set<string>): void {
+  for (const key of dirtyKeys) {
+    const chunk = world.chunks.get(key);
+    if (chunk) broadcast(world.id, { type: 'chunk_data', chunk: serializeChunk(chunk) as ChunkData });
+  }
 }
 
 function getBlockInWorld(world: WorldState, pos: Vec3): number {
@@ -401,11 +414,13 @@ function applyAction(world: WorldState, action: WorldAction, client: Client): bo
       const x0 = Math.min(min.x, max.x), x1 = Math.max(min.x, max.x);
       const y0 = Math.min(min.y, max.y), y1 = Math.max(min.y, max.y);
       const z0 = Math.min(min.z, max.z), z1 = Math.max(min.z, max.z);
+      const dirty = new Set<string>();
       for (let x = x0; x <= x1; x++)
         for (let y = y0; y <= y1; y++)
           for (let z = z0; z <= z1; z++)
-            placeBlockInWorld(world, { x, y, z }, material);
-      console.log(`[action] fill_region ${dx}x${dy}x${dz}=${dx*dy*dz} blocks by ${client.name}`);
+            placeBlockInWorld(world, { x, y, z }, material, dirty);
+      broadcastDirtyChunks(world, dirty);
+      console.log(`[action] fill_region ${dx}x${dy}x${dz}=${dx*dy*dz} blocks (${dirty.size} chunks) by ${client.name}`);
       return true;
     }
 
@@ -415,8 +430,10 @@ function applyAction(world: WorldState, action: WorldAction, client: Client): bo
         send(client, { type: 'error', message: `batch_place max ${MAX_BATCH_SIZE} blocks` });
         return false;
       }
-      for (const b of blocks) placeBlockInWorld(world, b.position, b.material);
-      console.log(`[action] batch_place ${blocks.length} blocks by ${client.name}`);
+      const dirty = new Set<string>();
+      for (const b of blocks) placeBlockInWorld(world, b.position, b.material, dirty);
+      broadcastDirtyChunks(world, dirty);
+      console.log(`[action] batch_place ${blocks.length} blocks (${dirty.size} chunks) by ${client.name}`);
       return true;
     }
 
@@ -456,17 +473,19 @@ function applyAction(world: WorldState, action: WorldAction, client: Client): bo
       // Find bounding box to support flip/rotate
       const maxDx = Math.max(...clipboard.map(b => b.dx));
       const maxDz = Math.max(...clipboard.map(b => b.dz));
+      const dirty = new Set<string>();
       let count = 0;
       for (const b of clipboard) {
         let dx = b.dx, dz = b.dz;
         if (flipX) dx = maxDx - dx;
         if (flipZ) dz = maxDz - dz;
         for (let r = 0; r < rot; r++) { const tmp = dx; dx = dz; dz = maxDx - tmp; }
-        placeBlockInWorld(world, { x: origin.x + dx, y: origin.y + b.dy, z: origin.z + dz }, b.material);
+        placeBlockInWorld(world, { x: origin.x + dx, y: origin.y + b.dy, z: origin.z + dz }, b.material, dirty);
         count++;
       }
+      broadcastDirtyChunks(world, dirty);
       send(client, { type: 'paste_ack', agentId: client.id, blockCount: count });
-      console.log(`[action] paste_region ${count} blocks at (${origin.x},${origin.y},${origin.z}) by ${client.name}`);
+      console.log(`[action] paste_region ${count} blocks (${dirty.size} chunks) at (${origin.x},${origin.y},${origin.z}) by ${client.name}`);
       return true;
     }
 
