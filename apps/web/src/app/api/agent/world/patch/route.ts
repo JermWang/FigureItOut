@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { prisma, Prisma } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { nanoid } from 'nanoid';
 
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
             actorType: 'agent',
             action: action.type,
             payload: JSON.parse(JSON.stringify(action.payload || action)),
-            previousState: null, // STUB: capture previous state for rollback
+            previousState: Prisma.JsonNull, // STUB: capture previous state for rollback
           },
         });
 

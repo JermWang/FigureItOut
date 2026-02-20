@@ -4,7 +4,19 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": [
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "NEXTAUTH_URL",
+        "NEXTAUTH_SECRET",
+        "WS_SERVER_PORT",
+        "WS_SERVER_URL",
+        "AGENT_API_SECRET",
+        "RATE_LIMIT_AGENT_RPM",
+        "RATE_LIMIT_USER_RPM",
+        "RATE_LIMIT_IP_RPM"
+      ]
     },
     "lint": {
       "dependsOn": ["^build"]

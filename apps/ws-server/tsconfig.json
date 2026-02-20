@@ -2,14 +2,14 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "rootDir": "../../",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "target": "ES2022",
     "paths": {
       "@fio/shared": ["../../packages/shared/src/index.ts"],
       "@fio/shared/*": ["../../packages/shared/src/*"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "../../packages/shared/src/**/*"]
 }
