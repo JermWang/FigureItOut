@@ -1,0 +1,26 @@
+{
+  "name": "fio",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "db:generate": "cd apps/web && npx prisma generate",
+    "db:push": "cd apps/web && npx prisma db push",
+    "db:migrate": "cd apps/web && npx prisma migrate dev",
+    "db:studio": "cd apps/web && npx prisma studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.0",
+    "typescript": "^5.5.0"
+  },
+  "packageManager": "npm@10.8.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

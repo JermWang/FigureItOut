@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ───
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  accounts      Account[]
+  sessions      Session[]
+  worlds        World[]   @relation("WorldOwner")
+  memberships   WorldMember[]
+  agentKeys     AgentKey[]
+  actions       AuditLog[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── World ───
+model World {
+  id           String        @id @default(cuid())
+  name         String
+  description  String        @default("")
+  ownerId      String
+  owner        User          @relation("WorldOwner", fields: [ownerId], references: [id])
+  settings     Json          @default("{}")
+  members      WorldMember[]
+  chunks       Chunk[]
+  entities     Entity[]
+  agentKeys    AgentKey[]
+  auditLogs    AuditLog[]
+  snapshots    Snapshot[]
+  proposals    Proposal[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([ownerId])
+}
+
+model WorldMember {
+  id      String @id @default(cuid())
+  worldId String
+  userId  String
+  role    String @default("viewer") // owner, admin, builder, viewer
+  world   World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, userId])
+  @@index([worldId])
+  @@index([userId])
+}
+
+// ─── Voxel Chunks ───
+model Chunk {
+  id      String @id @default(cuid())
+  worldId String
+  cx      Int
+  cy      Int
+  cz      Int
+  palette Json   // number[] of material IDs
+  data    Bytes  // compressed voxel data (palette indices)
+  version Int    @default(0)
+  world   World  @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, cx, cy, cz])
+  @@index([worldId])
+}
+
+// ─── Entities ───
+model Entity {
+  id          String   @id @default(cuid())
+  worldId     String
+  type        String
+  transform   Json     // { position, rotation, scale }
+  components  Json     @default("[]")
+  metadata    Json     @default("{}")
+  ownerId     String
+  permissions Json     @default("{}")
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([worldId])
+  @@index([ownerId])
+}
+
+// ─── Agent Keys ───
+model AgentKey {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  name        String
+  worldId     String
+  ownerId     String
+  role        String    @default("agent")
+  permissions Json      @default("[]")
+  quotas      Json      @default("{}")
+  active      Boolean   @default(true)
+  world       World     @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+
+  @@index([worldId])
+  @@index([ownerId])
+  @@index([key])
+}
+
+// ─── Audit Log ───
+model AuditLog {
+  id            String   @id @default(cuid())
+  worldId       String
+  actorId       String
+  actorType     String   // "user" | "agent"
+  action        String   // ActionType
+  payload       Json
+  previousState Json?
+  world         World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  actor         User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+
+  @@index([worldId])
+  @@index([actorId])
+  @@index([worldId, createdAt])
+}
+
+// ─── Snapshots ───
+model Snapshot {
+  id          String   @id @default(cuid())
+  worldId     String
+  createdBy   String
+  description String   @default("")
+  chunkData   Bytes    // serialized chunk state
+  entityData  Json     // serialized entities
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([worldId])
+  @@index([worldId, createdAt])
+}
+
+// ─── Proposals (agent changes needing human approval) ───
+model Proposal {
+  id          String   @id @default(cuid())
+  worldId     String
+  agentKeyId  String
+  actions     Json     // WorldAction[]
+  description String   @default("")
+  status      String   @default("pending") // pending, approved, rejected
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([worldId])
+  @@index([worldId, status])
+}
