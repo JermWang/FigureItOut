@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useWorldStore } from '@/store/world-store';
-import { Home, Gift, Bot, Camera, Undo2, Sparkles, Search } from 'lucide-react';
+import { Home, Bot, Camera, Sparkles, Search } from 'lucide-react';
 import { playCommandOpen, playCommandClose, playClick, playHover, playSuccess } from '@/lib/sounds';
 
 interface Command {
@@ -32,14 +32,6 @@ export default function CommandBar() {
       },
     },
     {
-      id: 'spawn-entity',
-      label: 'spawn something (coming soon)',
-      icon: <Gift className="w-4 h-4" />,
-      action: () => {
-        addActivity({ actorName: 'System', actorType: 'user', message: 'spawning stuff is coming soon!' });
-      },
-    },
-    {
       id: 'connect-agent',
       label: 'plug in a bot',
       icon: <Bot className="w-4 h-4" />,
@@ -53,14 +45,6 @@ export default function CommandBar() {
       icon: <Camera className="w-4 h-4" />,
       action: () => {
         addActivity({ actorName: 'System', actorType: 'user', message: 'snapshots coming soon' });
-      },
-    },
-    {
-      id: 'rollback',
-      label: 'undo everything (coming soon)',
-      icon: <Undo2 className="w-4 h-4" />,
-      action: () => {
-        addActivity({ actorName: 'System', actorType: 'user', message: 'time travel coming soon' });
       },
     },
   ];

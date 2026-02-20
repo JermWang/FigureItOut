@@ -137,7 +137,8 @@ function handleMessage(client: Client, raw: string) {
       // Simplified auth: accept any token, assign user role
       // In production: validate JWT / session token / agent API key
       client.name = msg.token || `User-${client.id.slice(0, 6)}`;
-      client.role = ROLES.BUILDER;
+      // Humans are observers only — agents get builder role via API key auth
+      client.role = client.type === 'agent' ? ROLES.BUILDER : ROLES.VIEWER;
       send(client, { type: 'auth_ok', userId: client.id, role: client.role });
       console.log(`[auth] ${client.name} (${client.id}) authenticated as ${client.role}`);
       break;
@@ -186,6 +187,11 @@ function handleMessage(client: Client, raw: string) {
     case 'action': {
       if (!client.worldId) {
         send(client, { type: 'error', message: 'Not in a world' });
+        return;
+      }
+      // Only agents can modify the world — humans are observers
+      if (client.type !== 'agent') {
+        send(client, { type: 'error', message: 'Only agents can modify the world' });
         return;
       }
       if (!hasPermission(client.role, 'write')) {
